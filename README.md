@@ -12,6 +12,10 @@ A modern, full-featured notes application built with React frontend and Node.js 
 - **Responsive Design**: Works on desktop and mobile devices
 - **Real-time Updates**: Instant UI updates after operations
 
+### Hosting
+- **Frontend**: Deployed on [Vercel](https://vercel.com/) → [Live App](https://thought-cloud-frontend.vercel.app/)  
+- **Backend**: Deployed on [Render](https://render.com/)
+
 ## 🛠️ Tech Stack
 
 ### Frontend
