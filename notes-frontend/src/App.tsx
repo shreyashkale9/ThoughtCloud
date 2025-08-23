@@ -7,6 +7,7 @@ import Home from '../../notes-frontend/src/pages/Home';
 import Login from '../../notes-frontend/src/pages/Login';
 import Register from '../../notes-frontend/src/pages/Register';
 import Landing from '../../notes-frontend/src/pages/Landing';
+import Profile from '../../notes-frontend/src/pages/Profile';
 
 function App() {
   const [mode, setMode] = useState<'light' | 'dark'>('light');
@@ -22,6 +23,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/dashboard" element={<Home />} />
+          <Route path="/profile" element={<Profile />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
         </Routes>

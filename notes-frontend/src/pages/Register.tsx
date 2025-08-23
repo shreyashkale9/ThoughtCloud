@@ -24,7 +24,7 @@ const Register: React.FC = () => {
       const loginRes = await api.post('/auth/login', { email, password });
       if (loginRes.token) {
         setToken(loginRes.token);
-        navigate('/');
+        navigate('/dashboard');
       } else {
         setError(loginRes.message || 'Registration succeeded, but login failed');
       }

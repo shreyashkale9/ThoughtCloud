@@ -17,12 +17,16 @@ const Login: React.FC = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    const res = await api.post('/auth/login', { email, password });
-    if (res.token) {
-      setToken(res.token);
-      navigate('/');
-    } else {
-      setError(res.message || 'Login failed');
+    try {
+      const res = await api.post('/auth/login', { email, password });
+      if (res.token) {
+        setToken(res.token);
+        navigate('/dashboard');
+      } else {
+        setError(res.message || 'Login failed');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Login failed');
     }
   };
 

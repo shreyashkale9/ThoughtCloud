@@ -3,10 +3,40 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import {
-  TextField, Button, Box, Typography, Chip, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Select, InputLabel, FormControl
+  TextField, 
+  Button, 
+  Box, 
+  Typography, 
+  Chip, 
+  IconButton, 
+  Dialog, 
+  DialogTitle, 
+  DialogContent, 
+  DialogActions, 
+  MenuItem, 
+  Select, 
+  InputLabel, 
+  FormControl,
+  Card,
+  CardContent,
+  CardActions,
+  Grid,
+  Fab,
+  Tooltip,
+  Divider,
+  useTheme,
+  useMediaQuery
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
+import SearchIcon from '@mui/icons-material/Search';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import FolderIcon from '@mui/icons-material/Folder';
+import LabelIcon from '@mui/icons-material/Label';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 
 /**
  * Note interface for type safety.
@@ -17,7 +47,33 @@ interface Note {
   content: string;
   folder?: string;
   tags?: string[];
+  createdAt?: string;
+  updatedAt?: string;
 }
+
+/**
+ * Quill editor modules configuration
+ */
+const quillModules = {
+  toolbar: [
+    [{ 'header': [1, 2, 3, false] }],
+    ['bold', 'italic', 'underline', 'strike'],
+    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+    [{ 'color': [] }, { 'background': [] }],
+    [{ 'align': [] }],
+    ['link', 'image'],
+    ['clean']
+  ],
+};
+
+const quillFormats = [
+  'header',
+  'bold', 'italic', 'underline', 'strike',
+  'list', 'bullet',
+  'color', 'background',
+  'align',
+  'link', 'image'
+];
 
 /**
  * Home page: displays, creates, edits, deletes, searches, and filters notes.
@@ -25,6 +81,9 @@ interface Note {
 const Home: React.FC = () => {
   const navigate = useNavigate();
   const { token } = useAuth();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  
   const [notes, setNotes] = useState<Note[]>([]);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -40,6 +99,9 @@ const Home: React.FC = () => {
   const [editNote, setEditNote] = useState<Note | null>(null);
   const [deleteNoteId, setDeleteNoteId] = useState<string | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [viewNote, setViewNote] = useState<Note | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   // Fetch notes, folders, and tags on mount or when token changes
   useEffect(() => {
@@ -179,6 +241,24 @@ const Home: React.FC = () => {
     fetchNotes('', selectedFolder, selectedTag, selectedTitle);
   };
 
+  // Helper functions
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const truncateContent = (content: string, maxLength: number = 150) => {
+    // Remove HTML tags for preview
+    const plainText = content.replace(/<[^>]*>/g, '');
+    return plainText.length > maxLength ? plainText.substring(0, maxLength) + '...' : plainText;
+  };
+
   // For title filter dropdown
   const uniqueTitles = Array.from(new Set(notes.map(n => n.title)));
 
@@ -201,189 +281,295 @@ const Home: React.FC = () => {
   }
 
   return (
-    <Box maxWidth={700} mx="auto" mt={4} px={{ xs: 2, sm: 3 }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: 10 }}>
       {/* Error Display */}
       {error && (
-        <Box mb={3} p={2} bgcolor="error.light" borderRadius={1}>
+        <Box mb={3} p={2} bgcolor="error.light" borderRadius={1} mx={{ xs: 2, sm: 3 }}>
           <Typography color="error.contrastText">{error}</Typography>
         </Box>
       )}
 
-      {/* Create Note Button */}
-      <Box display="flex" justifyContent="center" mb={4}>
-  <Button
-    variant="contained"
-    color="primary"
-    onClick={() => setCreateDialogOpen(true)}
-    sx={{
-      px: { xs: 4, md: 6 },
-      py: { xs: 1.5, md: 2 },
-      fontSize: { xs: '1.1rem', md: '1.3rem' },
-      fontWeight: 'bold',
-      boxShadow: 3,
-      borderRadius: 3,
-      textTransform: 'none',
-      letterSpacing: 1,
-      transition: 'transform 0.2s',
-      minHeight: { xs: '48px', md: '56px' },
-      width: { xs: '100%', sm: 'auto' },
-      '&:hover': {
-        transform: 'scale(1.05)',
-        boxShadow: 6,
-      },
-    }}
-  >
-    + Create Note
-  </Button>
-</Box>
-
-      {/* Search UI */}
-      <form onSubmit={handleSearch} style={{ width: '100%', marginBottom: 16 }}>
-        <Box display="flex" width="100%" alignItems="center" gap={2} flexDirection={{ xs: 'column', sm: 'row' }}>
-          <TextField
-            label="Search (Title/Folder/Tags)"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            size="small"
-            fullWidth
-          />
-          <Button 
-            type="submit" 
-            variant="outlined" 
-            sx={{ 
-              whiteSpace: 'nowrap',
-              width: { xs: '100%', sm: 'auto' },
-              minHeight: { xs: '40px', sm: 'auto' }
-            }}
-          >
-            Search
-          </Button>
-        </Box>
-      </form>
-
-      {/* Filter UI */}
-      <form onSubmit={handleFilter} style={{ width: '100%', marginBottom: 16 }}>
-        <Box display="flex" width="100%" alignItems="center" gap={2} flexDirection={{ xs: 'column', sm: 'row' }}>
-          <FormControl size="small" sx={{ minWidth: 120, flex: 1, width: '100%' }}>
-            <InputLabel>Folder</InputLabel>
-            <Select
-              value={selectedFolder}
-              label="Folder"
-              onChange={e => setSelectedFolder(e.target.value)}
-            >
-              <MenuItem value="">All</MenuItem>
-              {folders.map(f => (
-                <MenuItem key={f} value={f}>{f}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl size="small" sx={{ minWidth: 120, flex: 1, width: '100%' }}>
-            <InputLabel>Tag</InputLabel>
-            <Select
-              value={selectedTag}
-              label="Tag"
-              onChange={e => setSelectedTag(e.target.value)}
-            >
-              <MenuItem value="">All</MenuItem>
-              {tagsList.map(t => (
-                <MenuItem key={t} value={t}>{t}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl size="small" sx={{ minWidth: 120, flex: 1, width: '100%' }}>
-            <InputLabel>Title</InputLabel>
-            <Select
-              value={selectedTitle}
-              label="Title"
-              onChange={e => setSelectedTitle(e.target.value)}
-            >
-              <MenuItem value="">All</MenuItem>
-              {uniqueTitles.map(t => (
-                <MenuItem key={t} value={t}>{t}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <Button 
-            type="submit" 
-            variant="outlined" 
-            color="secondary" 
-            sx={{ 
-              whiteSpace: 'nowrap',
-              width: { xs: '100%', sm: 'auto' },
-              minHeight: { xs: '40px', sm: 'auto' }
-            }}
-          >
-            Filter
-          </Button>
-        </Box>
-      </form>
-
-      <Typography variant="h5" mt={4} mb={2} sx={{ fontSize: { xs: '1.5rem', md: '2rem' } }}>Your Notes</Typography>
-      {notes.length === 0 ? (
-        <Box textAlign="center" py={4}>
-          <Typography variant="body1" color="text.secondary">No notes found.</Typography>
-        </Box>
-      ) : (
-        notes.map(note => (
-          <Box key={note._id} border={1} borderRadius={2} p={{ xs: 1.5, md: 2 }} mb={2} position="relative">
-            <Typography variant="h6" sx={{ fontSize: { xs: '1.1rem', md: '1.25rem' }, mb: 1 }}>
-              {note.title}
-            </Typography>
-            <Typography sx={{ fontSize: { xs: '0.875rem', md: '1rem' }, mb: 1 }}>
-              {note.content}
-            </Typography>
-            <Typography variant="body2" color="textSecondary" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
-              Folder: {note.folder || 'None'}
-            </Typography>
-            <Box mt={1} sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-              {note.tags?.map(tag => (
-                <Chip 
-                  key={tag} 
-                  label={tag} 
-                  size="small" 
-                  sx={{ 
-                    fontSize: { xs: '0.75rem', md: '0.875rem' },
-                    height: { xs: '24px', md: '32px' }
-                  }} 
-                />
-              ))}
-            </Box>
-            <Box position="absolute" top={{ xs: 4, md: 8 }} right={{ xs: 4, md: 8 }}>
-              <IconButton 
+      {/* Header Section */}
+      <Box sx={{ 
+        bgcolor: 'background.paper', 
+        borderBottom: 1, 
+        borderColor: 'divider',
+        px: { xs: 2, sm: 3 },
+        py: 3
+      }}>
+        <Box maxWidth={1200} mx="auto">
+          <Typography variant="h4" sx={{ 
+            fontWeight: 700, 
+            mb: 2,
+            fontSize: { xs: '1.75rem', md: '2.125rem' }
+          }}>
+            My Notes
+          </Typography>
+          
+          {/* Search and Filter Bar */}
+          <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'stretch', sm: 'center' } }}>
+            <Box sx={{ display: 'flex', gap: 1, flex: 1 }}>
+              <TextField
+                placeholder="Search notes..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
                 size="small"
-                onClick={() => setEditNote(note)}
-                sx={{ p: { xs: 0.5, md: 1 } }}
+                fullWidth
+                InputProps={{
+                  startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />,
+                }}
+                sx={{ bgcolor: 'background.default' }}
+              />
+              <Button 
+                variant="outlined" 
+                onClick={() => setShowFilters(!showFilters)}
+                sx={{ minWidth: 'auto', px: 2 }}
               >
-                <EditIcon sx={{ fontSize: { xs: '1.2rem', md: '1.5rem' } }} />
-              </IconButton>
-              <IconButton 
-                size="small"
-                onClick={() => setDeleteNoteId(note._id)}
-                sx={{ p: { xs: 0.5, md: 1 } }}
-              >
-                <DeleteIcon sx={{ fontSize: { xs: '1.2rem', md: '1.5rem' } }} />
-              </IconButton>
+                <FilterListIcon />
+              </Button>
             </Box>
+            <Button 
+              variant="contained" 
+              onClick={() => setCreateDialogOpen(true)}
+              startIcon={<AddIcon />}
+              sx={{ 
+                whiteSpace: 'nowrap',
+                px: 3,
+                py: 1,
+                minHeight: '40px'
+              }}
+            >
+              New Note
+            </Button>
           </Box>
-        ))
-      )}
+
+          {/* Filters */}
+          {showFilters && (
+            <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
+                             <form onSubmit={handleFilter}>
+                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2 }}>
+                   <FormControl size="small" fullWidth>
+                     <InputLabel>Folder</InputLabel>
+                     <Select
+                       value={selectedFolder}
+                       label="Folder"
+                       onChange={e => setSelectedFolder(e.target.value)}
+                     >
+                       <MenuItem value="">All Folders</MenuItem>
+                       {folders.map(f => (
+                         <MenuItem key={f} value={f}>{f}</MenuItem>
+                       ))}
+                     </Select>
+                   </FormControl>
+                   <FormControl size="small" fullWidth>
+                     <InputLabel>Tag</InputLabel>
+                     <Select
+                       value={selectedTag}
+                       label="Tag"
+                       onChange={e => setSelectedTag(e.target.value)}
+                     >
+                       <MenuItem value="">All Tags</MenuItem>
+                       {tagsList.map(t => (
+                         <MenuItem key={t} value={t}>{t}</MenuItem>
+                       ))}
+                     </Select>
+                   </FormControl>
+                   <Button 
+                     type="submit" 
+                     variant="outlined" 
+                     fullWidth
+                     sx={{ height: '40px' }}
+                   >
+                     Apply Filters
+                   </Button>
+                 </Box>
+               </form>
+            </Box>
+          )}
+        </Box>
+      </Box>
+
+      {/* Notes Grid */}
+      <Box maxWidth={1200} mx="auto" px={{ xs: 2, sm: 3 }} pt={4}>
+        {notes.length === 0 ? (
+          <Box textAlign="center" py={8}>
+            <Typography variant="h6" color="text.secondary" mb={2}>
+              No notes found
+            </Typography>
+            <Typography variant="body2" color="text.secondary" mb={3}>
+              {search || selectedFolder || selectedTag ? 'Try adjusting your search or filters.' : 'Create your first note to get started!'}
+            </Typography>
+            {!search && !selectedFolder && !selectedTag && (
+              <Button 
+                variant="contained" 
+                onClick={() => setCreateDialogOpen(true)}
+                startIcon={<AddIcon />}
+              >
+                Create Your First Note
+              </Button>
+            )}
+          </Box>
+                 ) : (
+           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 3 }}>
+             {notes.map(note => (
+               <Box key={note._id}>
+                <Card 
+                  sx={{ 
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: theme.shadows[8],
+                    },
+                  }}
+                  onClick={() => {
+                    setViewNote(note);
+                    setIsEditMode(false);
+                  }}
+                >
+                  <CardContent sx={{ flexGrow: 1, pb: 1 }}>
+                    <Typography variant="h6" sx={{ 
+                      fontWeight: 600, 
+                      mb: 1,
+                      fontSize: { xs: '1rem', md: '1.1rem' },
+                      lineHeight: 1.3
+                    }}>
+                      {note.title}
+                    </Typography>
+                    
+                    <Typography variant="body2" color="text.secondary" sx={{ 
+                      mb: 2,
+                      fontSize: { xs: '0.875rem', md: '0.9rem' },
+                      lineHeight: 1.4
+                    }}>
+                      {truncateContent(note.content, 100)}
+                    </Typography>
+
+                    {note.folder && (
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                        <FolderIcon sx={{ fontSize: 16, color: 'text.secondary', mr: 0.5 }} />
+                        <Typography variant="caption" color="text.secondary">
+                          {note.folder}
+                        </Typography>
+                      </Box>
+                    )}
+
+                    {note.tags && note.tags.length > 0 && (
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2 }}>
+                        {note.tags.slice(0, 3).map(tag => (
+                          <Chip 
+                            key={tag} 
+                            label={tag} 
+                            size="small" 
+                            icon={<LabelIcon />}
+                            sx={{ 
+                              fontSize: '0.75rem',
+                              height: '20px'
+                            }} 
+                          />
+                        ))}
+                        {note.tags.length > 3 && (
+                          <Chip 
+                            label={`+${note.tags.length - 3}`} 
+                            size="small" 
+                            sx={{ 
+                              fontSize: '0.75rem',
+                              height: '20px'
+                            }} 
+                          />
+                        )}
+                      </Box>
+                    )}
+
+                    {note.updatedAt && (
+                      <Typography variant="caption" color="text.secondary">
+                        Updated {formatDate(note.updatedAt)}
+                      </Typography>
+                    )}
+                  </CardContent>
+                  
+                  <CardActions sx={{ p: 1, pt: 0 }}>
+                    <Box sx={{ display: 'flex', gap: 0.5, width: '100%' }}>
+                      <Tooltip title="View">
+                        <IconButton 
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewNote(note);
+                            setIsEditMode(false);
+                          }}
+                        >
+                          <VisibilityIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Edit">
+                        <IconButton 
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditNote(note);
+                          }}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton 
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteNoteId(note._id);
+                          }}
+                          sx={{ ml: 'auto' }}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  </CardActions>
+                                 </Card>
+               </Box>
+             ))}
+           </Box>
+        )}
+      </Box>
+
+      {/* Floating Action Button for Mobile */}
+      <Fab
+        color="primary"
+        aria-label="add note"
+        onClick={() => setCreateDialogOpen(true)}
+        sx={{
+          position: 'fixed',
+          bottom: 16,
+          right: 16,
+          display: { xs: 'flex', md: 'none' }
+        }}
+      >
+        <AddIcon />
+      </Fab>
 
       {/* Create Note Dialog */}
       <Dialog 
         open={createDialogOpen} 
         onClose={() => setCreateDialogOpen(false)} 
-        maxWidth="sm" 
+        maxWidth="md" 
         fullWidth
         sx={{
           '& .MuiDialog-paper': {
             margin: { xs: 2, sm: 'auto' },
-            width: { xs: 'calc(100% - 32px)', sm: 'auto' }
+            width: { xs: 'calc(100% - 32px)', sm: 'auto' },
+            height: { xs: 'calc(100% - 32px)', sm: 'auto' },
+            maxHeight: { xs: 'calc(100% - 32px)', sm: '80vh' }
           }
         }}
       >
         <DialogTitle>Create a Note</DialogTitle>
         <form onSubmit={handleCreate}>
-          <DialogContent>
+          <DialogContent sx={{ pb: 1 }}>
             <TextField
               label="Title"
               fullWidth
@@ -391,23 +577,30 @@ const Home: React.FC = () => {
               value={title}
               onChange={e => setTitle(e.target.value)}
               required
+              sx={{ mb: 2 }}
             />
-            <TextField
-              label="Content"
-              fullWidth
-              margin="normal"
-              multiline
-              minRows={3}
-              value={content}
-              onChange={e => setContent(e.target.value)}
-              required
-            />
+            
+            <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+              Content
+            </Typography>
+            <Box sx={{ mb: 2, border: 1, borderColor: 'divider', borderRadius: 1 }}>
+              <ReactQuill
+                theme="snow"
+                value={content}
+                onChange={setContent}
+                modules={quillModules}
+                formats={quillFormats}
+                style={{ height: '200px' }}
+              />
+            </Box>
+            
             <TextField
               label="Folder"
               fullWidth
               margin="normal"
               value={folder}
               onChange={e => setFolder(e.target.value)}
+              sx={{ mb: 2 }}
             />
             <TextField
               label="Tags (comma separated)"
@@ -415,12 +608,13 @@ const Home: React.FC = () => {
               margin="normal"
               value={tags}
               onChange={e => setTags(e.target.value)}
+              placeholder="work, ideas, personal"
             />
-            {error && <Typography color="error">{error}</Typography>}
+            {error && <Typography color="error" sx={{ mt: 2 }}>{error}</Typography>}
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setCreateDialogOpen(false)}>Cancel</Button>
-            <Button type="submit" variant="contained" color="primary">Create</Button>
+            <Button type="submit" variant="contained" color="primary">Create Note</Button>
           </DialogActions>
         </form>
       </Dialog>
@@ -429,39 +623,49 @@ const Home: React.FC = () => {
       <Dialog 
         open={!!editNote} 
         onClose={() => setEditNote(null)} 
-        maxWidth="sm" 
+        maxWidth="md" 
         fullWidth
         sx={{
           '& .MuiDialog-paper': {
             margin: { xs: 2, sm: 'auto' },
-            width: { xs: 'calc(100% - 32px)', sm: 'auto' }
+            width: { xs: 'calc(100% - 32px)', sm: 'auto' },
+            height: { xs: 'calc(100% - 32px)', sm: 'auto' },
+            maxHeight: { xs: 'calc(100% - 32px)', sm: '80vh' }
           }
         }}
       >
         <DialogTitle>Edit Note</DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ pb: 1 }}>
           <TextField
             label="Title"
             fullWidth
             margin="normal"
             value={editNote?.title || ''}
             onChange={e => setEditNote(editNote ? { ...editNote, title: e.target.value } : null)}
+            sx={{ mb: 2 }}
           />
-          <TextField
-            label="Content"
-            fullWidth
-            margin="normal"
-            multiline
-            minRows={3}
-            value={editNote?.content || ''}
-            onChange={e => setEditNote(editNote ? { ...editNote, content: e.target.value } : null)}
-          />
+          
+          <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+            Content
+          </Typography>
+          <Box sx={{ mb: 2, border: 1, borderColor: 'divider', borderRadius: 1 }}>
+            <ReactQuill
+              theme="snow"
+              value={editNote?.content || ''}
+              onChange={(value) => setEditNote(editNote ? { ...editNote, content: value } : null)}
+              modules={quillModules}
+              formats={quillFormats}
+              style={{ height: '200px' }}
+            />
+          </Box>
+          
           <TextField
             label="Folder"
             fullWidth
             margin="normal"
             value={editNote?.folder || ''}
             onChange={e => setEditNote(editNote ? { ...editNote, folder: e.target.value } : null)}
+            sx={{ mb: 2 }}
           />
           <TextField
             label="Tags (comma separated)"
@@ -475,11 +679,118 @@ const Home: React.FC = () => {
                   : null
               )
             }
+            placeholder="work, ideas, personal"
           />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditNote(null)}>Cancel</Button>
-          <Button onClick={handleUpdate} variant="contained" color="primary">Save</Button>
+          <Button onClick={handleUpdate} variant="contained" color="primary">Save Changes</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* View Note Dialog */}
+      <Dialog 
+        open={!!viewNote} 
+        onClose={() => setViewNote(null)} 
+        maxWidth="md" 
+        fullWidth
+        sx={{
+          '& .MuiDialog-paper': {
+            margin: { xs: 2, sm: 'auto' },
+            width: { xs: 'calc(100% - 32px)', sm: 'auto' },
+            maxHeight: { xs: 'calc(100% - 32px)', sm: '80vh' }
+          }
+        }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              {viewNote?.title}
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Tooltip title="Edit">
+                <IconButton 
+                  size="small"
+                  onClick={() => {
+                    setEditNote(viewNote);
+                    setViewNote(null);
+                  }}
+                >
+                  <EditIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Delete">
+                <IconButton 
+                  size="small"
+                  onClick={() => {
+                    setDeleteNoteId(viewNote?._id || null);
+                    setViewNote(null);
+                  }}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ pb: 1 }}>
+          {viewNote && (
+            <>
+              <Box sx={{ mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <FolderIcon sx={{ fontSize: 16, color: 'text.secondary', mr: 1 }} />
+                  <Typography variant="body2" color="text.secondary">
+                    {viewNote.folder || 'No folder'}
+                  </Typography>
+                </Box>
+                
+                {viewNote.tags && viewNote.tags.length > 0 && (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                    {viewNote.tags.map(tag => (
+                      <Chip 
+                        key={tag} 
+                        label={tag} 
+                        size="small" 
+                        icon={<LabelIcon />}
+                        sx={{ fontSize: '0.75rem' }} 
+                      />
+                    ))}
+                  </Box>
+                )}
+                
+                {viewNote.updatedAt && (
+                  <Typography variant="caption" color="text.secondary">
+                    Last updated: {formatDate(viewNote.updatedAt)}
+                  </Typography>
+                )}
+              </Box>
+              
+              <Divider sx={{ mb: 2 }} />
+              
+              <Box 
+                sx={{ 
+                  '& .ql-editor': { 
+                    padding: 0,
+                    fontSize: '1rem',
+                    lineHeight: 1.6
+                  }
+                }}
+                dangerouslySetInnerHTML={{ __html: viewNote.content }}
+              />
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setViewNote(null)}>Close</Button>
+          <Button 
+            variant="contained" 
+            onClick={() => {
+              setEditNote(viewNote);
+              setViewNote(null);
+            }}
+          >
+            Edit Note
+          </Button>
         </DialogActions>
       </Dialog>
 

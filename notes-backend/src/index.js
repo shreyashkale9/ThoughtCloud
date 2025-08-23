@@ -6,6 +6,7 @@ require('dotenv').config();
 //Define routes
 const authRoutes = require('./routes/auth');
 const notesRoutes = require('./routes/notes');
+const profileRoutes = require('./routes/profile');
 
 const app = express();
 
@@ -25,6 +26,9 @@ app.use('/api/auth', authRoutes);
 
 //Notes routes
 app.use('/api/notes', notesRoutes);
+
+//Profile routes
+app.use('/api/profile', profileRoutes);
 
 // Test root route
 app.get('/', (req, res) => {
